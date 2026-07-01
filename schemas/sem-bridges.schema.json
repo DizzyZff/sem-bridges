@@ -1,0 +1,335 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sem-bridges.dev/schemas/sem-bridges.schema.json",
+  "title": "Sem Bridges Output Envelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "bridge",
+    "kind",
+    "generatedAt",
+    "data"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "Sem Bridges schema version used by this payload."
+    },
+    "bridge": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "Analyzer bridge that produced the output."
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "solutionSnapshot",
+        "diagnostics",
+        "symbolSearch",
+        "references",
+        "publicApi",
+        "typeGraph",
+        "capabilities"
+      ],
+      "description": "Command-specific payload kind."
+    },
+    "generatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC timestamp for payload generation."
+    },
+    "data": {
+      "type": "object",
+      "description": "Command-specific payload. Shape is refined by kind-specific schemas over time."
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Language-neutral execution metadata."
+    },
+    "bridgeSpecific": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Bridge-specific details that should not become top-level contract fields."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "solutionSnapshot"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "$ref": "#/$defs/solutionSnapshot"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "diagnostics"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "$ref": "#/$defs/diagnostics"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "symbolSearch"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "$ref": "#/$defs/symbolSearch"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "capabilities"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "$ref": "#/$defs/capabilities"
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "location": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "file",
+        "line",
+        "column"
+      ],
+      "properties": {
+        "file": {
+          "type": "string"
+        },
+        "line": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "column": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "solutionSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "root",
+        "projects"
+      ],
+      "properties": {
+        "root": {
+          "type": "string"
+        },
+        "projects": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "path",
+              "language",
+              "documentCount"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string"
+              },
+              "language": {
+                "type": "string"
+              },
+              "targetFrameworks": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "projectReferences": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "packageReferences": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "documentCount": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        }
+      }
+    },
+    "diagnostics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "diagnostics"
+      ],
+      "properties": {
+        "diagnostics": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "severity",
+              "message",
+              "project"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "severity": {
+                "type": "string",
+                "enum": [
+                  "hidden",
+                  "info",
+                  "warning",
+                  "error"
+                ]
+              },
+              "message": {
+                "type": "string"
+              },
+              "project": {
+                "type": "string"
+              },
+              "location": {
+                "$ref": "#/$defs/location"
+              }
+            }
+          }
+        }
+      }
+    },
+    "symbolSearch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "query",
+        "matches"
+      ],
+      "properties": {
+        "query": {
+          "type": "string"
+        },
+        "matches": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "kind",
+              "project",
+              "location"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "qualifiedName": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "accessibility": {
+                "type": "string"
+              },
+              "signature": {
+                "type": "string"
+              },
+              "project": {
+                "type": "string"
+              },
+              "location": {
+                "$ref": "#/$defs/location"
+              }
+            }
+          }
+        }
+      }
+    },
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "commands"
+      ],
+      "properties": {
+        "commands": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "supported"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "supported": {
+                "type": "boolean"
+              },
+              "limitations": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

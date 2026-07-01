@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "0.1.0",
+  "bridge": "roslyn",
+  "kind": "symbolSearch",
+  "generatedAt": "2026-07-01T18:00:00Z",
+  "data": {
+    "query": "CustomerService",
+    "matches": [
+      {
+        "name": "CustomerService",
+        "qualifiedName": "SampleApp.Core.Services.CustomerService",
+        "kind": "class",
+        "accessibility": "public",
+        "project": "SampleApp.Core",
+        "location": {
+          "file": "fixtures/dotnet/src/SampleApp.Core/Services/CustomerService.cs",
+          "line": 5,
+          "column": 14
+        }
+      }
+    ]
+  },
+  "bridgeSpecific": {
+    "roslyn": {
+      "matchReason": "DeclaredSymbolName"
+    }
+  }
+}

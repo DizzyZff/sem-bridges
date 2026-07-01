@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "0.1.0",
+  "bridge": "roslyn",
+  "kind": "diagnostics",
+  "generatedAt": "2026-07-01T18:00:00Z",
+  "data": {
+    "diagnostics": [
+      {
+        "id": "CS8618",
+        "severity": "warning",
+        "message": "Non-nullable property must contain a non-null value when exiting constructor.",
+        "project": "SampleApp.Core",
+        "location": {
+          "file": "fixtures/dotnet/src/SampleApp.Core/Customer.cs",
+          "line": 7,
+          "column": 19
+        }
+      }
+    ]
+  },
+  "metadata": {
+    "truncated": false
+  },
+  "bridgeSpecific": {
+    "roslyn": {
+      "category": "Compiler"
+    }
+  }
+}
