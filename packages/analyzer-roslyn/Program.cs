@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -60,7 +61,19 @@ async Task<int> RunLoadAsync(string[] args)
             new { usage = "sem-bridges-roslyn load <path>" }), 2);
     }
 
-    var resolution = ResolveInput(args[1]);
+    InputResolution resolution;
+    try
+    {
+        resolution = ResolveInput(args[1]);
+    }
+    catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException or UnauthorizedAccessException)
+    {
+        return WriteJson(ErrorEnvelope(
+            "invalid_path",
+            "Path could not be resolved.",
+            new { path = args[1], error = ex.Message }), 2);
+    }
+
     if (resolution.Error is not null)
     {
         return WriteJson(resolution.Error, 2);
@@ -83,7 +96,7 @@ async Task<int> RunLoadAsync(string[] args)
     try
     {
         using var workspace = MSBuildWorkspace.Create();
-        var workspaceFailureMessages = new List<string>();
+        var workspaceFailureMessages = new ConcurrentBag<string>();
         workspace.WorkspaceFailed += (_, e) => workspaceFailureMessages.Add(e.Diagnostic.Message);
 
         if (target.Kind == "project")
@@ -199,7 +212,7 @@ bool IsSolutionLike(string path)
     return extension is ".sln" or ".slnx";
 }
 
-string[] CollectWorkspaceDiagnostics(MSBuildWorkspace workspace, IReadOnlyCollection<string> workspaceFailureMessages)
+string[] CollectWorkspaceDiagnostics(MSBuildWorkspace workspace, IEnumerable<string> workspaceFailureMessages)
 {
     return workspaceFailureMessages
         .Concat(workspace.Diagnostics.Select(diagnostic => diagnostic.Message))
