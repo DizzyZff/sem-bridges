@@ -46,6 +46,35 @@ The intended layout is:
 
 Some directories may not exist until their first implementation slice lands.
 
+## Roslyn Analyzer
+
+The initial Roslyn bridge lives in `packages/analyzer-roslyn`.
+
+Build it with:
+
+```bash
+dotnet build packages/analyzer-roslyn/SemBridges.Analyzer.Roslyn.csproj
+```
+
+Show bridge capabilities:
+
+```bash
+dotnet run --project packages/analyzer-roslyn/SemBridges.Analyzer.Roslyn.csproj -- capabilities
+```
+
+Smoke-test loading a C# project or solution:
+
+```bash
+dotnet run --project packages/analyzer-roslyn/SemBridges.Analyzer.Roslyn.csproj -- load fixtures/dotnet/SemBridges.Sample
+```
+
+Machine-facing commands write one Sem Bridges JSON envelope to stdout. Help and version commands are human-readable:
+
+```bash
+dotnet run --project packages/analyzer-roslyn/SemBridges.Analyzer.Roslyn.csproj -- --help
+dotnet run --project packages/analyzer-roslyn/SemBridges.Analyzer.Roslyn.csproj -- --version
+```
+
 ## v0.1 Non-Goals
 
 - No automatic code modification.
