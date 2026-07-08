@@ -66,7 +66,7 @@ async Task<int> RunLoadAsync(string[] args)
     {
         resolution = ResolveInput(args[1]);
     }
-    catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException or UnauthorizedAccessException)
+    catch (Exception ex)
     {
         return WriteJson(ErrorEnvelope(
             "invalid_path",
