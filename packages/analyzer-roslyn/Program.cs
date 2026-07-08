@@ -83,7 +83,8 @@ async Task<int> RunLoadAsync(string[] args)
     try
     {
         using var workspace = MSBuildWorkspace.Create();
-        workspace.WorkspaceFailed += (_, e) => Console.Error.WriteLine(e.Diagnostic.Message);
+        var workspaceFailureMessages = new List<string>();
+        workspace.WorkspaceFailed += (_, e) => workspaceFailureMessages.Add(e.Diagnostic.Message);
 
         if (target.Kind == "project")
         {
@@ -96,7 +97,7 @@ async Task<int> RunLoadAsync(string[] args)
                 project.FilePath,
                 1,
                 project.DocumentIds.Count,
-                workspace.Diagnostics.Select(d => d.Message).ToArray())));
+                CollectWorkspaceDiagnostics(workspace, workspaceFailureMessages))));
         }
 
         var solution = await workspace.OpenSolutionAsync(target.Path);
@@ -109,7 +110,7 @@ async Task<int> RunLoadAsync(string[] args)
             solution.FilePath,
             projects.Length,
             projects.Sum(project => project.DocumentIds.Count),
-            workspace.Diagnostics.Select(d => d.Message).ToArray())));
+            CollectWorkspaceDiagnostics(workspace, workspaceFailureMessages))));
     }
     catch (Exception ex)
     {
@@ -196,6 +197,14 @@ bool IsSolutionLike(string path)
 {
     var extension = Path.GetExtension(path).ToLowerInvariant();
     return extension is ".sln" or ".slnx";
+}
+
+string[] CollectWorkspaceDiagnostics(MSBuildWorkspace workspace, IReadOnlyCollection<string> workspaceFailureMessages)
+{
+    return workspaceFailureMessages
+        .Concat(workspace.Diagnostics.Select(diagnostic => diagnostic.Message))
+        .Distinct(StringComparer.Ordinal)
+        .ToArray();
 }
 
 SemEnvelope Envelope(string kind, object data)
