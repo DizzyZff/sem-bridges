@@ -2,11 +2,13 @@ using System.Collections.Concurrent;
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Xml.Linq;
 using Microsoft.Build.Locator;
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.MSBuild;
 
 const string BridgeName = "roslyn";
-const string SchemaVersion = "0.1";
+const string SchemaVersion = "0.1.0";
 
 JsonSerializerOptions JsonOptions = new()
 {
@@ -36,18 +38,19 @@ async Task<int> RunAsync(string[] args)
         "capabilities" => WriteJson(Envelope("capabilities", new CapabilitiesData(
             BridgeName,
             SchemaVersion,
-            ["capabilities", "load"],
+            ["capabilities", "load", "snapshot"],
             [".sln", ".slnx", ".csproj", "directory"],
             [
-                "snapshot, diagnostics, symbol-search, references, public-api, and type-graph are not implemented in this foundation release.",
+                "diagnostics, symbol-search, references, public-api, and type-graph are not implemented in this release.",
                 "Directory input resolution only inspects the immediate directory.",
                 ".slnx loading depends on installed MSBuild and Roslyn workspace support."
             ]))),
         "load" => await RunLoadAsync(args),
+        "snapshot" => await RunSnapshotAsync(args),
         _ => WriteJson(ErrorEnvelope(
             "unknown_command",
             $"Unknown command '{args[0]}'.",
-            new { command = args[0], supportedCommands = new[] { "capabilities", "load" } }), 2)
+            new { command = args[0], supportedCommands = new[] { "capabilities", "load", "snapshot" } }), 2)
     };
 }
 
@@ -130,6 +133,76 @@ async Task<int> RunLoadAsync(string[] args)
         return WriteJson(ErrorEnvelope(
             "load_failed",
             "Roslyn could not load the resolved project or solution.",
+            new { target.Path, target.Kind, error = ex.Message }), 2);
+    }
+}
+
+async Task<int> RunSnapshotAsync(string[] args)
+{
+    if (args.Length != 2)
+    {
+        return WriteJson(ErrorEnvelope(
+            "invalid_arguments",
+            "The snapshot command requires exactly one path argument.",
+            new { usage = "sem-bridges-roslyn snapshot <path>" }), 2);
+    }
+
+    InputResolution resolution;
+    try
+    {
+        resolution = ResolveInput(args[1]);
+    }
+    catch (Exception ex)
+    {
+        return WriteJson(ErrorEnvelope(
+            "invalid_path",
+            "Path could not be resolved.",
+            new { path = args[1], error = ex.Message }), 2);
+    }
+
+    if (resolution.Error is not null)
+    {
+        return WriteJson(resolution.Error, 2);
+    }
+
+    var target = resolution.Target!;
+
+    try
+    {
+        RegisterMsBuild();
+    }
+    catch (Exception ex)
+    {
+        return WriteJson(ErrorEnvelope(
+            "workspace_setup_failed",
+            "MSBuild could not be registered before creating the Roslyn workspace.",
+            new { target.Path, target.Kind, error = ex.Message }), 2);
+    }
+
+    try
+    {
+        using var workspace = MSBuildWorkspace.Create();
+
+        Solution solution;
+        if (target.Kind == "project")
+        {
+            var project = await workspace.OpenProjectAsync(target.Path);
+            solution = project.Solution;
+        }
+        else
+        {
+            solution = await workspace.OpenSolutionAsync(target.Path);
+        }
+
+        return WriteJson(Envelope("solutionSnapshot", BuildSnapshotData(
+            target.Path,
+            solution)));
+    }
+    catch (Exception ex)
+    {
+        return WriteJson(ErrorEnvelope(
+            "snapshot_failed",
+            "Roslyn could not create a snapshot for the resolved project or solution.",
             new { target.Path, target.Kind, error = ex.Message }), 2);
     }
 }
@@ -220,6 +293,102 @@ string[] CollectWorkspaceDiagnostics(MSBuildWorkspace workspace, IEnumerable<str
         .ToArray();
 }
 
+SnapshotData BuildSnapshotData(string root, Solution solution)
+{
+    var projectNamesById = solution.Projects.ToDictionary(project => project.Id, project => project.Name);
+    var projects = solution.Projects
+        .Select(project => BuildSnapshotProject(project, projectNamesById))
+        .OrderBy(project => project.Name, StringComparer.OrdinalIgnoreCase)
+        .ThenBy(project => project.Path, StringComparer.OrdinalIgnoreCase)
+        .ToArray();
+
+    return new SnapshotData(root, projects);
+}
+
+SnapshotProject BuildSnapshotProject(Project project, IReadOnlyDictionary<ProjectId, string> projectNamesById)
+{
+    var projectReferences = project.ProjectReferences
+        .Select(reference => projectNamesById.TryGetValue(reference.ProjectId, out var name)
+            ? name
+            : reference.ProjectId.Id.ToString())
+        .Distinct(StringComparer.Ordinal)
+        .OrderBy(reference => reference, StringComparer.OrdinalIgnoreCase)
+        .ToArray();
+
+    return new SnapshotProject(
+        project.Name,
+        project.FilePath ?? string.Empty,
+        NormalizeLanguage(project.Language),
+        ReadTargetFrameworks(project.FilePath),
+        projectReferences,
+        ReadPackageReferences(project.FilePath),
+        project.DocumentIds.Count);
+}
+
+string NormalizeLanguage(string language)
+{
+    return language switch
+    {
+        LanguageNames.CSharp => "csharp",
+        LanguageNames.VisualBasic => "visual-basic",
+        _ => language.ToLowerInvariant()
+    };
+}
+
+string[] ReadTargetFrameworks(string? projectPath)
+{
+    var document = TryLoadProjectXml(projectPath);
+    if (document is null)
+    {
+        return [];
+    }
+
+    var values = document.Descendants()
+        .Where(element => element.Name.LocalName is "TargetFramework" or "TargetFrameworks")
+        .Select(element => element.Value)
+        .SelectMany(value => value.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+
+    return values
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+        .ToArray();
+}
+
+string[] ReadPackageReferences(string? projectPath)
+{
+    var document = TryLoadProjectXml(projectPath);
+    if (document is null)
+    {
+        return [];
+    }
+
+    return document.Descendants()
+        .Where(element => element.Name.LocalName == "PackageReference")
+        .Select(element => (string?)element.Attribute("Include") ?? (string?)element.Attribute("Update"))
+        .Where(value => !string.IsNullOrWhiteSpace(value))
+        .Select(value => value!)
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+        .ToArray();
+}
+
+XDocument? TryLoadProjectXml(string? projectPath)
+{
+    if (string.IsNullOrWhiteSpace(projectPath) || !File.Exists(projectPath))
+    {
+        return null;
+    }
+
+    try
+    {
+        return XDocument.Load(projectPath);
+    }
+    catch
+    {
+        return null;
+    }
+}
+
 SemEnvelope Envelope(string kind, object data)
 {
     return new SemEnvelope(SchemaVersion, BridgeName, kind, DateTimeOffset.UtcNow, data);
@@ -264,6 +433,7 @@ void PrintHelp()
     Commands:
       capabilities          Emit bridge capabilities as Sem Bridges JSON.
       load <path>           Resolve and load a .sln, .slnx, .csproj, or directory input.
+      snapshot <path>       Emit project and solution structure as Sem Bridges JSON.
       help                  Show this help text.
       version               Show the analyzer CLI version.
 
@@ -301,6 +471,19 @@ sealed record LoadData(
     int ProjectCount,
     int DocumentCount,
     string[] WorkspaceDiagnostics);
+
+sealed record SnapshotData(
+    string Root,
+    SnapshotProject[] Projects);
+
+sealed record SnapshotProject(
+    string Name,
+    string Path,
+    string Language,
+    string[] TargetFrameworks,
+    string[] ProjectReferences,
+    string[] PackageReferences,
+    int DocumentCount);
 
 sealed record LoadTarget(
     string Kind,

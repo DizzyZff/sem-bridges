@@ -68,6 +68,12 @@ Smoke-test loading a C# project or solution:
 dotnet run --project packages/analyzer-roslyn/SemBridges.Analyzer.Roslyn.csproj -- load fixtures/dotnet/SemBridges.Sample
 ```
 
+Emit a compact project or solution snapshot:
+
+```bash
+dotnet run --project packages/analyzer-roslyn/SemBridges.Analyzer.Roslyn.csproj -- snapshot fixtures/dotnet/SemBridges.Sample.sln
+```
+
 Machine-facing commands write one Sem Bridges JSON envelope to stdout. Help and version commands are human-readable:
 
 ```bash
