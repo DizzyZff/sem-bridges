@@ -15,6 +15,7 @@ When adding implementation code, keep the structure predictable:
 - `openspec` for change proposals, specs, designs, and task plans.
 
 Some directories may not exist until their first implementation slice lands.
+Do not introduce a top-level `src`, `tests`, or `assets` layout unless the public docs and OpenSpec direction are updated together.
 
 ## Build, Test, and Development Commands
 
