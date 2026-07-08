@@ -162,20 +162,10 @@ InputResolution ResolveInput(string input)
         .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
         .ToArray();
 
-    if (solutionCandidates.Length == 1)
-    {
-        return InputResolution.FromTarget(new LoadTarget("solution", solutionCandidates[0], "directory"));
-    }
-
     var projectCandidates = Directory
         .EnumerateFiles(fullPath, "*.csproj", SearchOption.TopDirectoryOnly)
         .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
         .ToArray();
-
-    if (solutionCandidates.Length == 0 && projectCandidates.Length == 1)
-    {
-        return InputResolution.FromTarget(new LoadTarget("project", projectCandidates[0], "directory"));
-    }
 
     var candidates = solutionCandidates.Concat(projectCandidates).ToArray();
     if (candidates.Length > 1)
@@ -184,6 +174,16 @@ InputResolution ResolveInput(string input)
             "ambiguous_directory",
             "Directory contains multiple plausible project or solution inputs. Pass an explicit path.",
             new { path = fullPath, candidates }));
+    }
+
+    if (solutionCandidates.Length == 1)
+    {
+        return InputResolution.FromTarget(new LoadTarget("solution", solutionCandidates[0], "directory"));
+    }
+
+    if (projectCandidates.Length == 1)
+    {
+        return InputResolution.FromTarget(new LoadTarget("project", projectCandidates[0], "directory"));
     }
 
     return InputResolution.FromError(ErrorEnvelope(
