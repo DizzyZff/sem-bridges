@@ -1,0 +1,30 @@
+schema: spec-driven
+
+context: |
+  Sem Bridges is a stack-agnostic semantic code intelligence project for AI coding agents.
+  It exposes compiler/static-analysis facts through MCP so agents can inspect projects with structured semantic context instead of relying only on text search.
+
+  Architecture direction:
+  - Roslyn/C# is the first analyzer bridge for v0.1, not the whole product.
+  - Analyzer bridges emit compact, schema-aligned JSON using a shared language-neutral envelope.
+  - The TypeScript MCP server is the agent-facing boundary and routes requests to analyzer bridges.
+  - Claude Code packaging belongs under plugins/claude-code and must not define the core architecture.
+
+  Expected layout:
+  - packages/analyzer-roslyn for the .NET/Roslyn bridge.
+  - packages/mcp-server for MCP routing and tools.
+  - schemas for shared JSON schemas and examples.
+  - fixtures for small test projects.
+  - docs for architecture, bridge contract, development, and usage documentation.
+
+  v0.1 non-goals: automatic code modification, IDE replacement, custom C# parsing outside Roslyn, and additional language bridge implementations before the Roslyn bridge proves the contract.
+
+rules:
+  proposal:
+    - Keep Roslyn framed as the first bridge, not the product boundary.
+    - Call out whether a change affects the shared bridge contract, MCP boundary, or a specific bridge implementation.
+  design:
+    - Keep top-level contracts language-neutral; put bridge-specific details under bridge-specific sections or metadata.
+    - Prefer stable semantic MCP tool names over language-specific tool names.
+  tasks:
+    - Separate foundation, schema, analyzer, MCP, plugin, fixture, and documentation work when practical.

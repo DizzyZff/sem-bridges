@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "0.1.0",
+  "bridge": "roslyn",
+  "kind": "solutionSnapshot",
+  "generatedAt": "2026-07-01T18:00:00Z",
+  "data": {
+    "root": "fixtures/dotnet/SampleApp.sln",
+    "projects": [
+      {
+        "name": "SampleApp.Core",
+        "path": "fixtures/dotnet/src/SampleApp.Core/SampleApp.Core.csproj",
+        "language": "csharp",
+        "targetFrameworks": [
+          "net8.0"
+        ],
+        "projectReferences": [],
+        "packageReferences": [],
+        "documentCount": 8
+      },
+      {
+        "name": "SampleApp.Web",
+        "path": "fixtures/dotnet/src/SampleApp.Web/SampleApp.Web.csproj",
+        "language": "csharp",
+        "targetFrameworks": [
+          "net8.0"
+        ],
+        "projectReferences": [
+          "SampleApp.Core"
+        ],
+        "packageReferences": [
+          "Microsoft.AspNetCore.OpenApi"
+        ],
+        "documentCount": 12
+      }
+    ]
+  },
+  "bridgeSpecific": {
+    "roslyn": {
+      "workspace": "MSBuildWorkspace"
+    }
+  }
+}
